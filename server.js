@@ -4,17 +4,23 @@ import { Server } from 'socket.io';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import 'dotenv/config';
 
+// 1. INITIALIZATION & SETUP
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: { origin: "*" } });
 
 app.use(express.static('public'));
 
+// Initialize Gemini SDK
 const aiKey = process.env.GEMINI_API_KEY;
 const ai = aiKey ? new GoogleGenerativeAI(aiKey) : null;
 
+// 2. IN-MEMORY GAME STORES
 const rooms = {};
-const baseQuestions = [ /* ... keep your existing 20 question array here ... */ ];
+const baseQuestions = [
+  { id: 1, question: "Name something you bring with you to the beach.", answers: [ {text: "towel", points: 35, keywords: ["towel", "beach towel"]}, {text: "sunscreen", points: 25, keywords: ["sunscreen", "lotion", "sunblock"]}, {text: "umbrella", points: 15, keywords: ["umbrella", "shade"]}, {text: "sunglasses", points: 12, keywords: ["sunglasses", "shades", "glasses"]}, {text: "cooler", points: 8, keywords: ["cooler", "drinks", "food", "snacks"]} ] },
+  { id: 2, question: "Name a common excuse for being late to work.", answers: [ {text: "traffic", points: 45, keywords: ["traffic", "car traffic", "jam"]}, {text: "overslept", points: 25, keywords: ["overslept", "alarm", "slept in"]}, {text: "car trouble", points: 15, keywords: ["car trouble", "flat tire", "dead battery"]}, {text: "sick", points: 8, keywords: ["sick", "ill", "doctor"]}, {text: "train delayed", points: 5, keywords: ["train", "bus", "transit", "transit delay"]} ] }
+];
 
 async function fetchAIHostDialogue(promptText) {
   if (!ai) return "Let's see what's on the board!";
@@ -27,6 +33,7 @@ async function fetchAIHostDialogue(promptText) {
   }
 }
 
+// 4. REAL-TIME WEBSOCKET (SOCKET.IO) MANAGEMENT
 io.on('connection', (socket) => {
   socket.on('createRoom', async ({ playerName }) => {
     const roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
@@ -34,6 +41,30 @@ io.on('connection', (socket) => {
     socket.join(roomCode);
     io.to(roomCode).emit('roomUpdated', { room: rooms[roomCode] });
   });
+
+  socket.on('startGame', async ({ roomCode }) => {
+    const room = rooms[roomCode];
+    if (!room) return;
+    room.players.forEach((p, idx) => p.team = room.players.length <= 3 ? 'FFA' : (idx % 2 === 0 ? 'Team A' : 'Team B'));
+    room.gameState = 'buzzer';
+    const dialogue = await fetchAIHostDialogue(`The game is starting! The category is: "${room.questions[room.currentQuestionIndex].question}". Players, get ready to buzz in!`);
+    io.to(roomCode).emit('gameUpdated', { room, hostDialogue: dialogue });
+  });
+
+  socket.on('buzz', async ({ roomCode }) => {
+    const room = rooms[roomCode];
+    if (!room || room.gameState !== 'buzzer') return;
+    const player = room.players.find(p => p.id === socket.id);
+    room.controllingTeam = player.team === 'FFA' ? player.id : player.team;
+    room.gameState = 'playing';
+    io.to(roomCode).emit('gameUpdated', { room, hostDialogue: `${player.name} buzzed in! Give us your answer.` });
+  });
+
+  socket.on('disconnect', () => console.log('User disconnected'));
+});
+
+const PORT = process.env.PORT || 3000;
+httpServer.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 
   socket.on('startGame', async ({ roomCode }) => {
     const room = rooms[roomCode];
