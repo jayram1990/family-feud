@@ -1,39 +1,44 @@
-const socket = io();
+const socket = io({
+  reconnection: true,
+  reconnectionAttempts: 10,
+  reconnectionDelay: 1000
+});
 
-// DOM Elements
-const views = {
-  landing: document.getElementById('landing-view'),
-  lobby: document.getElementById('lobby-view'),
-  game: document.getElementById('game-view')
-};
-
-const aiBox = document.getElementById('ai-host-box');
-const aiText = document.getElementById('ai-text');
-
-let currentRoomCode = null;
 let myId = null;
+let currentRoomCode = null;
 let isHost = false;
 
-// Helpers
-function switchView(viewName) {
-  Object.values(views).forEach(v => v.classList.add('hidden'));
-  views[viewName].classList.remove('hidden');
-}
+socket.on('connect', () => { myId = socket.id; });
 
-function updateAIHost(text) {
-  if (text) {
-    aiBox.classList.remove('hidden');
-    aiText.innerText = text;
+function renderGame(room) {
+  const q = room.questions[room.currentQuestionIndex];
+  const me = room.players.find(p => p.id === myId);
+  const qEl = document.getElementById('current-question');
+
+  // Buzzer logic
+  if (room.gameState === 'buzzer') {
+    qEl.innerText = q.question;
+    document.getElementById('btn-buzz').classList.remove('hidden');
+  } else if (room.gameState === 'playing') {
+    const haveControl = (me.team === 'FFA' && room.controllingTeam === me.id) || 
+                        (me.team !== 'FFA' && room.controllingTeam === me.team);
+    
+    if (haveControl) {
+      qEl.innerText = q.question; // Show question when playing
+      document.getElementById('guess-form').classList.remove('hidden');
+    } else {
+      qEl.innerText = "WAITING FOR OPPONENT'S TURN...";
+      document.getElementById('btn-buzz').classList.add('hidden');
+    }
   }
+  // ... rest of rendering logic ...
 }
 
-// -------------------------
-// LANDING LOGIC
-// -------------------------
-document.getElementById('btn-host').addEventListener('click', () => {
-  const name = document.getElementById('player-name').value.trim() || 'Host';
-  isHost = true;
-  socket.emit('createRoom', { playerName: name });
+// Ensure you have a listener for gameUpdated to call renderGame(room)
+socket.on('gameUpdated', ({ room, hostDialogue }) => {
+  renderGame(room);
+  document.getElementById('ai-text').innerText = hostDialogue;
+});
 });
 
 document.getElementById('btn-join').addEventListener('click', () => {
