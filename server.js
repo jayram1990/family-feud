@@ -3,37 +3,24 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Initialize
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: { origin: "*" } });
 
 app.use(express.static('public'));
 
-// AI Config (Simplified)
 const aiKey = process.env.GEMINI_API_KEY;
-const ai = aiKey ? new GoogleGenerativeAI(aiKey) : null;
+const genAI = aiKey ? new GoogleGenerativeAI(aiKey) : null;
 
-// Game State
-const rooms = {};
-
-// Helper
-async function fetchAIHostDialogue(promptText) {
-  if (!ai) return "Let's play!";
-  try {
-    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent(promptText);
-    return result.response.text();
-  } catch (e) { return "Let's go!"; }
-}
-
-// Sockets
 io.on('connection', (socket) => {
-  socket.on('createRoom', ({ playerName }) => {
-    const code = Math.random().toString(36).substring(2, 6).toUpperCase();
-    rooms[code] = { code, players: [{ id: socket.id, name: playerName, team: 'FFA', score: 0 }], gameState: 'lobby' };
-    socket.join(code);
-    io.to(code).emit('roomUpdated', { room: rooms[code] });
+  console.log('User connected');
+  socket.on('createRoom', (data) => {
+    socket.emit('roomUpdated', { room: { code: 'TEST', players: [] } });
+  });
+});
+
+const PORT = process.env.PORT || 3000;
+httpServer.listen(PORT, () => console.log(`Server started on port ${PORT}`));
   });
 });
 
