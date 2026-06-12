@@ -3,37 +3,27 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Initialize core services
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: { origin: "*" } });
 
-// Serve frontend from the 'public' folder
 app.use(express.static('public'));
 
-// Setup AI
 const aiKey = process.env.GEMINI_API_KEY;
 const genAI = aiKey ? new GoogleGenerativeAI(aiKey) : null;
 
-// Real-time communication
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
   
   socket.on('createRoom', (data) => {
-    // Basic room handling
     socket.emit('roomUpdated', { room: { code: 'TEST', players: [] } });
   });
 });
 
-// Start server
 const PORT = process.env.PORT || 3000;
 httpServer.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });
-    const room = rooms[roomCode];
-    clearInterval(room.timerInterval);
-    // Logic: If guess correct, add points. If steal phase, points * 2.
-    // If incorrect, strike++. If 3 strikes, set gameState = 'steal'.
     io.to(roomCode).emit('gameUpdated', { room });
   });
 });
