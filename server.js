@@ -4,36 +4,60 @@ import { Server } from 'socket.io';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import 'dotenv/config';
 
-// 1. INITIALIZATION & SETUP
 const app = express();
 const httpServer = createServer(app);
-const io = new Server(httpServer, {
-  cors: { origin: "*" }
-});
+const io = new Server(httpServer, { cors: { origin: "*" } });
 
 app.use(express.static('public'));
 
-// Initialize Gemini SDK
 const aiKey = process.env.GEMINI_API_KEY;
-const ai = aiKey ? new GoogleGenerativeAI({ apiKey: aiKey }) : null;
+const ai = aiKey ? new GoogleGenerativeAI(aiKey) : null;
 
-// 2. IN-MEMORY GAME STORES
 const rooms = {};
+const baseQuestions = [ /* ... keep your existing 20 question array here ... */ ];
 
-// Full Question Bank
-const baseQuestions = [
-  { id: 1, question: "Name something you bring with you to the beach.", answers: [ {text: "towel", points: 35, keywords: ["towel", "beach towel"]}, {text: "sunscreen", points: 25, keywords: ["sunscreen", "lotion", "sunblock"]}, {text: "umbrella", points: 15, keywords: ["umbrella", "shade"]}, {text: "sunglasses", points: 12, keywords: ["sunglasses", "shades", "glasses"]}, {text: "cooler", points: 8, keywords: ["cooler", "drinks", "food", "snacks"]} ] },
-  { id: 2, question: "Name a common excuse for being late to work.", answers: [ {text: "traffic", points: 45, keywords: ["traffic", "car traffic", "jam"]}, {text: "overslept", points: 25, keywords: ["overslept", "alarm", "slept in"]}, {text: "car trouble", points: 15, keywords: ["car trouble", "flat tire", "dead battery"]}, {text: "sick", points: 8, keywords: ["sick", "ill", "doctor"]}, {text: "train delayed", points: 5, keywords: ["train", "bus", "transit", "transit delay"]} ] },
-  { id: 3, question: "Name something people do as soon as they get home from work.", answers: [ {text: "change clothes", points: 42, keywords: ["change", "clothes", "pajamas"]}, {text: "take off shoes", points: 24, keywords: ["shoes", "boots", "footwear"]}, {text: "shower", points: 14, keywords: ["shower", "bath", "wash"]}, {text: "watch tv", points: 10, keywords: ["tv", "television", "netflix"]}, {text: "eat", points: 7, keywords: ["eat", "snack", "dinner"]} ] },
-  { id: 4, question: "Name something you buy that gets ruined if it rains.", answers: [ {text: "newspaper", points: 38, keywords: ["newspaper", "paper", "book", "magazine"]}, {text: "shoes", points: 28, keywords: ["shoes", "suede", "sneakers"]}, {text: "cotton candy", points: 14, keywords: ["cotton candy", "candy"]}, {text: "cardboard box", points: 10, keywords: ["cardboard", "box"]}, {text: "bread", points: 6, keywords: ["bread", "food"]} ] },
-  { id: 5, question: "Name a place where you are supposed to stay completely quiet.", answers: [ {text: "library", points: 50, keywords: ["library", "bookstore"]}, {text: "movie theater", points: 22, keywords: ["movie", "theater", "cinema"]}, {text: "church", points: 15, keywords: ["church", "temple", "mosque", "chapel"]}, {text: "courtroom", points: 8, keywords: ["court", "courtroom", "judge"]}, {text: "hospital", points: 3, keywords: ["hospital", "clinic"]} ] },
-  { id: 6, question: "Name something you might find in a magician's top hat.", answers: [ {text: "rabbit", points: 55, keywords: ["rabbit", "bunny"]}, {text: "scarf", points: 18, keywords: ["scarf", "handkerchief", "ribbon"]}, {text: "cards", points: 12, keywords: ["cards", "playing cards"]}, {text: "wand", points: 8, keywords: ["wand", "magic wand"]}, {text: "dove", points: 4, keywords: ["dove", "bird"]} ] },
-  { id: 7, question: "Name an activity that makes your muscles sore the next day.", answers: [ {text: "weightlifting", points: 40, keywords: ["weights", "lifting", "gym", "workout"]}, {text: "running", points: 26, keywords: ["running", "jogging", "sprinting"]}, {text: "moving furniture", points: 15, keywords: ["moving", "furniture", "lifting boxes"]}, {text: "hiking", points: 10, keywords: ["hiking", "climbing"]}, {text: "swimming", points: 5, keywords: ["swimming", "swim"]} ] },
-  { id: 8, question: "Name a food that is difficult to eat cleanly while driving.", answers: [ {text: "taco", points: 42, keywords: ["taco", "burrito"]}, {text: "hamburger", points: 25, keywords: ["burger", "hamburger"]}, {text: "soup", points: 14, keywords: ["soup", "broth"]}, {text: "spaghetti", points: 10, keywords: ["spaghetti", "pasta", "noodles"]}, {text: "ice cream cone", points: 6, keywords: ["ice cream", "cone"]} ] },
-  { id: 9, question: "Name something people complain about when flying on a plane.", answers: [ {text: "legroom", points: 38, keywords: ["legroom", "seats", "space", "cramped"]}, {text: "crying baby", points: 28, keywords: ["baby", "crying", "kids", "noise"]}, {text: "airplane food", points: 15, keywords: ["food", "meal", "airplane food"]}, {text: "delays", points: 11, keywords: ["delays", "late", "cancelled"]}, {text: "turbulence", points: 5, keywords: ["turbulence", "bumpy"]} ] },
-  { id: 10, question: "Name a superhero whose name does NOT end with the word 'man'.", answers: [ {text: "wolverine", points: 30, keywords: ["wolverine"]}, {text: "thor", points: 24, keywords: ["thor"]}, {text: "hulk", points: 18, keywords: ["hulk", "incredible hulk"]}, {text: "wonder woman", points: 15, keywords: ["wonder woman"]}, {text: "captain america", points: 8, keywords: ["captain america", "captain"]} ] },
-  { id: 11, question: "Name something you use to open a bottle of wine.", answers: [ {text: "corkscrew", points: 65, keywords: ["corkscrew", "opener", "bottle opener"]}, {text: "knife", points: 12, keywords: ["knife"]}, {text: "shoe", points: 8, keywords: ["shoe"]}, {text: "key", points: 5, keywords: ["key"]}, {text: "teeth", points: 3, keywords: ["teeth", "tooth"]} ] },
-  { id: 12, question: "Name something that has a shell.", answers: [ {text: "turtle", points: 45, keywords: ["turtle", "tortoise"]}, {text: "egg", points: 25, keywords: ["egg"]}, {text: "snail", points: 15, keywords: ["snail"]}, {text: "crab", points: 10, keywords: ["crab", "lobster", "shrimp"]}, {text: "peanut", points: 3, keywords: ["peanut", "walnut", "nut"]} ] },
+async function fetchAIHostDialogue(promptText) {
+  if (!ai) return "Let's see what's on the board!";
+  try {
+    const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const result = await model.generateContent(promptText);
+    return result.response.text().trim();
+  } catch (error) {
+    return "The crowd goes wild! Let's see how our players handle this next one.";
+  }
+}
+
+io.on('connection', (socket) => {
+  socket.on('createRoom', async ({ playerName }) => {
+    const roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
+    rooms[roomCode] = { code: roomCode, players: [{ id: socket.id, name: playerName, team: null, score: 0 }], gameState: 'lobby', questions: [...baseQuestions].sort(() => 0.5 - Math.random()), currentQuestionIndex: 0, revealedAnswers: [], strikes: 0, teamScores: { 'Team A': 0, 'Team B': 0, 'FFA': 0 }, controllingTeam: null };
+    socket.join(roomCode);
+    io.to(roomCode).emit('roomUpdated', { room: rooms[roomCode] });
+  });
+
+  socket.on('startGame', async ({ roomCode }) => {
+    const room = rooms[roomCode];
+    if (!room) return;
+    room.players.forEach((p, idx) => p.team = room.players.length <= 3 ? 'FFA' : (idx % 2 === 0 ? 'Team A' : 'Team B'));
+    room.gameState = 'buzzer';
+    const dialogue = await fetchAIHostDialogue(`Start the game! The category is: "${room.questions[room.currentQuestionIndex].question}". Tell players to get ready to BUZZ IN.`);
+    io.to(roomCode).emit('gameUpdated', { room, hostDialogue: dialogue });
+  });
+
+  socket.on('buzz', async ({ roomCode }) => {
+    const room = rooms[roomCode];
+    if (!room || room.gameState !== 'buzzer') return;
+    const player = room.players.find(p => p.id === socket.id);
+    room.controllingTeam = player.team === 'FFA' ? player.id : player.team;
+    room.gameState = 'playing';
+    io.to(roomCode).emit('gameUpdated', { room, hostDialogue: `${player.name} buzzed in!` });
+  });
+
+  // ... (Keep existing submitGuess and nextRound logic here) ...
+});
+
+const PORT = process.env.PORT || 3000;
+httpServer.listen(PORT, () => console.log(`Server running`));
   { id: 13, question: "Name a pet that doesn't make any noise.", answers: [ {text: "fish", points: 60, keywords: ["fish", "goldfish"]}, {text: "turtle", points: 18, keywords: ["turtle", "tortoise"]}, {text: "snake", points: 10, keywords: ["snake", "lizard", "reptile"]}, {text: "rock", points: 6, keywords: ["pet rock", "rock"]}, {text: "hamster", points: 4, keywords: ["hamster", "gerbil"]} ] },
   { id: 14, question: "Name something you might find at the bottom of a woman's purse.", answers: [ {text: "coins", points: 40, keywords: ["coins", "money", "change"]}, {text: "keys", points: 22, keywords: ["keys", "car keys"]}, {text: "lip balm", points: 15, keywords: ["lipstick", "lip balm", "makeup", "gloss"]}, {text: "receipts", points: 12, keywords: ["receipts", "paper", "trash"]}, {text: "mints", points: 6, keywords: ["mints", "gum", "candy"]} ] },
   { id: 15, question: "Name something that turns yellow as it ages.", answers: [ {text: "paper", points: 48, keywords: ["paper", "books", "pages"]}, {text: "teeth", points: 26, keywords: ["teeth", "tooth"]}, {text: "banana", points: 14, keywords: ["banana", "fruit"]}, {text: "leaves", points: 8, keywords: ["leaves", "leaf"]}, {text: "bruise", points: 3, keywords: ["bruise", "skin"]} ] },
