@@ -5,35 +5,31 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Family Feud Mobile</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    body {
-      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
-      color: white;
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-    .glowing-border {
-      box-shadow: 0 0 15px rgba(250, 204, 21, 0.5);
-      border: 2px solid #facc15;
-    }
-    /* Flip Card Styles */
-    .flip-card {
-      background-color: transparent;
-      height: 60px;
-      perspective: 1000px;
-    }
-    .flip-card-inner {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      text-align: center;
-      transition: transform 0.6s;
-      transform-style: preserve-3d;
-    }
-    .flip-card.flipped .flip-card-inner {
-      transform: rotateX(180deg);
-    }
-    .flip-card-front, .flip-card-back {
-      position: absolute;
+</head>
+<body class="bg-indigo-900 text-white min-h-screen">
+  <main class="max-w-md mx-auto p-4 flex flex-col gap-4">
+    <div id="scoreboard" class="flex justify-between p-4 bg-black rounded-lg border-2 border-yellow-500 font-bold text-xl">
+      <div>A: <span id="score-a">0</span></div>
+      <div id="timer-display" class="text-yellow-400">--</div>
+      <div>B: <span id="score-b">0</span></div>
+    </div>
+    
+    <div id="ai-host-box" class="p-2 bg-indigo-800 rounded text-center italic text-sm"></div>
+    <div id="current-question" class="text-center font-bold text-xl py-4"></div>
+    <div id="the-board" class="grid grid-cols-1 gap-2"></div>
+
+    <div id="interaction-area" class="mt-4">
+      <button id="btn-buzz" class="hidden w-full py-8 bg-red-600 rounded-full font-black text-2xl">BUZZ IN!</button>
+      <div id="guess-form" class="hidden flex gap-2">
+        <input type="text" id="guess-input" class="flex-grow p-3 text-black rounded" placeholder="Your answer...">
+        <button id="btn-submit-guess" class="bg-green-600 px-4 rounded">Submit</button>
+      </div>
+    </div>
+  </main>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
       width: 100%;
       height: 100%;
       backface-visibility: hidden;
