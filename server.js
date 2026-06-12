@@ -2,38 +2,43 @@ import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import 'dotenv/config';
 
-// 1. INITIALIZATION & SETUP
+// Initialize
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: { origin: "*" } });
 
 app.use(express.static('public'));
 
-// Initialize Gemini SDK
+// AI Config (Simplified)
 const aiKey = process.env.GEMINI_API_KEY;
 const ai = aiKey ? new GoogleGenerativeAI(aiKey) : null;
 
-// 2. IN-MEMORY GAME STORES
+// Game State
 const rooms = {};
-const baseQuestions = [
-  { id: 1, question: "Name something you bring with you to the beach.", answers: [ {text: "towel", points: 35, keywords: ["towel", "beach towel"]}, {text: "sunscreen", points: 25, keywords: ["sunscreen", "lotion", "sunblock"]}, {text: "umbrella", points: 15, keywords: ["umbrella", "shade"]}, {text: "sunglasses", points: 12, keywords: ["sunglasses", "shades", "glasses"]}, {text: "cooler", points: 8, keywords: ["cooler", "drinks", "food", "snacks"]} ] },
-  { id: 2, question: "Name a common excuse for being late to work.", answers: [ {text: "traffic", points: 45, keywords: ["traffic", "car traffic", "jam"]}, {text: "overslept", points: 25, keywords: ["overslept", "alarm", "slept in"]}, {text: "car trouble", points: 15, keywords: ["car trouble", "flat tire", "dead battery"]}, {text: "sick", points: 8, keywords: ["sick", "ill", "doctor"]}, {text: "train delayed", points: 5, keywords: ["train", "bus", "transit", "transit delay"]} ] }
-];
 
+// Helper
 async function fetchAIHostDialogue(promptText) {
-  if (!ai) return "Let's see what's on the board!";
+  if (!ai) return "Let's play!";
   try {
     const model = ai.getGenerativeModel({ model: "gemini-1.5-flash" });
     const result = await model.generateContent(promptText);
-    return result.response.text().trim();
-  } catch (error) {
-    return "The crowd goes wild! Let's see how our players handle this next one.";
-  }
+    return result.response.text();
+  } catch (e) { return "Let's go!"; }
 }
 
-// 4. REAL-TIME WEBSOCKET (SOCKET.IO) MANAGEMENT
+// Sockets
+io.on('connection', (socket) => {
+  socket.on('createRoom', ({ playerName }) => {
+    const code = Math.random().toString(36).substring(2, 6).toUpperCase();
+    rooms[code] = { code, players: [{ id: socket.id, name: playerName, team: 'FFA', score: 0 }], gameState: 'lobby' };
+    socket.join(code);
+    io.to(code).emit('roomUpdated', { room: rooms[code] });
+  });
+});
+
+const PORT = process.env.PORT || 3000;
+httpServer.listen(PORT, () => console.log(`Running on ${PORT}`));
 io.on('connection', (socket) => {
   socket.on('createRoom', async ({ playerName }) => {
     const roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
