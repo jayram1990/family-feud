@@ -1,7 +1,7 @@
 import express from 'express';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import 'dotenv/config';
 
 // 1. INITIALIZATION & SETUP
@@ -15,7 +15,7 @@ app.use(express.static('public'));
 
 // Initialize Gemini SDK
 const aiKey = process.env.GEMINI_API_KEY;
-const ai = aiKey ? new GoogleGenAI({ apiKey: aiKey }) : null;
+const ai = aiKey ? new GoogleGenerativeAI({ apiKey: aiKey }) : null;
 
 // 2. IN-MEMORY GAME STORES
 const rooms = {};
