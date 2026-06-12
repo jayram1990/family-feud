@@ -1,39 +1,23 @@
-const socket = io({
-  reconnection: true,
-  reconnectionAttempts: 10,
-  reconnectionDelay: 1000
+const socket = io();
+
+socket.on('timerUpdate', (timer) => {
+  document.getElementById('timer-display').innerText = timer + 's';
 });
 
-let myId = null;
-let currentRoomCode = null;
-let isHost = false;
-
-socket.on('connect', () => { myId = socket.id; });
-
-function renderGame(room) {
-  const q = room.questions[room.currentQuestionIndex];
-  const me = room.players.find(p => p.id === myId);
-  const qEl = document.getElementById('current-question');
-
-  // Buzzer logic
-  if (room.gameState === 'buzzer') {
-    qEl.innerText = q.question;
-    document.getElementById('btn-buzz').classList.remove('hidden');
-  } else if (room.gameState === 'playing') {
-    const haveControl = (me.team === 'FFA' && room.controllingTeam === me.id) || 
-                        (me.team !== 'FFA' && room.controllingTeam === me.team);
-    
-    if (haveControl) {
-      qEl.innerText = q.question; // Show question when playing
-      document.getElementById('guess-form').classList.remove('hidden');
-    } else {
-      qEl.innerText = "WAITING FOR OPPONENT'S TURN...";
-      document.getElementById('btn-buzz').classList.add('hidden');
-    }
+socket.on('gameUpdated', ({ room }) => {
+  document.getElementById('score-a').innerText = room.teamScores['Team A'];
+  document.getElementById('score-b').innerText = room.teamScores['Team B'];
+  
+  // Show/Hide buzzer based on state
+  const btnBuzz = document.getElementById('btn-buzz');
+  if(room.gameState === 'buzzer') btnBuzz.classList.remove('hidden');
+  else btnBuzz.classList.add('hidden');
+  
+  // Show/Hide input based on control
+  if(room.controllingTeam === socket.id) {
+    document.getElementById('guess-form').classList.remove('hidden');
   }
-  // ... rest of rendering logic ...
-}
-
+});
 // Ensure you have a listener for gameUpdated to call renderGame(room)
 socket.on('gameUpdated', ({ room, hostDialogue }) => {
   renderGame(room);
