@@ -3,37 +3,33 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+// Initialize core services
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: { origin: "*" } });
+
+// Serve frontend from the 'public' folder
 app.use(express.static('public'));
 
-const ai = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
-const rooms = {};
+// Setup AI
+const aiKey = process.env.GEMINI_API_KEY;
+const genAI = aiKey ? new GoogleGenerativeAI(aiKey) : null;
 
-function startTimer(roomCode, io) {
-  let timer = 20;
-  const interval = setInterval(() => {
-    timer--;
-    io.to(roomCode).emit('timerUpdate', timer);
-    if (timer <= 0) {
-      clearInterval(interval);
-      io.to(roomCode).emit('timeUp');
-    }
-  }, 1000);
-  rooms[roomCode].timerInterval = interval;
-}
-
+// Real-time communication
 io.on('connection', (socket) => {
-  socket.on('buzz', ({ roomCode }) => {
-    const room = rooms[roomCode];
-    room.gameState = 'playing';
-    room.controllingTeam = socket.id; // Simplified team tracking
-    startTimer(roomCode, io);
-    io.to(roomCode).emit('gameUpdated', { room });
+  console.log('User connected:', socket.id);
+  
+  socket.on('createRoom', (data) => {
+    // Basic room handling
+    socket.emit('roomUpdated', { room: { code: 'TEST', players: [] } });
   });
+});
 
-  socket.on('submitGuess', ({ roomCode, guess }) => {
+// Start server
+const PORT = process.env.PORT || 3000;
+httpServer.listen(PORT, () => {
+  console.log(`Server started on port ${PORT}`);
+});
     const room = rooms[roomCode];
     clearInterval(room.timerInterval);
     // Logic: If guess correct, add points. If steal phase, points * 2.
