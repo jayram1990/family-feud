@@ -6,34 +6,43 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 const app = express();
 const httpServer = createServer(app);
 const io = new Server(httpServer, { cors: { origin: "*" } });
-
 app.use(express.static('public'));
 
-const aiKey = process.env.GEMINI_API_KEY;
-const genAI = aiKey ? new GoogleGenerativeAI(aiKey) : null;
+const ai = process.env.GEMINI_API_KEY ? new GoogleGenerativeAI(process.env.GEMINI_API_KEY) : null;
+const rooms = {};
+
+function startTimer(roomCode, io) {
+  let timer = 20;
+  const interval = setInterval(() => {
+    timer--;
+    io.to(roomCode).emit('timerUpdate', timer);
+    if (timer <= 0) {
+      clearInterval(interval);
+      io.to(roomCode).emit('timeUp');
+    }
+  }, 1000);
+  rooms[roomCode].timerInterval = interval;
+}
 
 io.on('connection', (socket) => {
-  console.log('User connected');
-  socket.on('createRoom', (data) => {
-    socket.emit('roomUpdated', { room: { code: 'TEST', players: [] } });
+  socket.on('buzz', ({ roomCode }) => {
+    const room = rooms[roomCode];
+    room.gameState = 'playing';
+    room.controllingTeam = socket.id; // Simplified team tracking
+    startTimer(roomCode, io);
+    io.to(roomCode).emit('gameUpdated', { room });
+  });
+
+  socket.on('submitGuess', ({ roomCode, guess }) => {
+    const room = rooms[roomCode];
+    clearInterval(room.timerInterval);
+    // Logic: If guess correct, add points. If steal phase, points * 2.
+    // If incorrect, strike++. If 3 strikes, set gameState = 'steal'.
+    io.to(roomCode).emit('gameUpdated', { room });
   });
 });
 
-const PORT = process.env.PORT || 3000;
-httpServer.listen(PORT, () => console.log(`Server started on port ${PORT}`));
-  });
-});
-
-const PORT = process.env.PORT || 3000;
-httpServer.listen(PORT, () => console.log(`Running on ${PORT}`));
-io.on('connection', (socket) => {
-  socket.on('createRoom', async ({ playerName }) => {
-    const roomCode = Math.random().toString(36).substring(2, 6).toUpperCase();
-    rooms[roomCode] = { code: roomCode, players: [{ id: socket.id, name: playerName, team: null, score: 0 }], gameState: 'lobby', questions: [...baseQuestions].sort(() => 0.5 - Math.random()), currentQuestionIndex: 0, revealedAnswers: [], strikes: 0, teamScores: { 'Team A': 0, 'Team B': 0, 'FFA': 0 }, controllingTeam: null };
-    socket.join(roomCode);
-    io.to(roomCode).emit('roomUpdated', { room: rooms[roomCode] });
-  });
-
+httpServer.listen(3000);
   socket.on('startGame', async ({ roomCode }) => {
     const room = rooms[roomCode];
     if (!room) return;
